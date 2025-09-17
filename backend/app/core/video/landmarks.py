@@ -1,10 +1,14 @@
 from typing import Dict, Any, List, Tuple
 import numpy as np
 import cv2
-import mediapipe as mp
 
 
-_mp_face_mesh = mp.solutions.face_mesh
+def _get_face_mesh():
+    try:
+        import mediapipe as mp
+        return mp.solutions.face_mesh
+    except Exception:
+        return None
 
 
 def _landmarks_to_numpy(landmarks, image_shape: Tuple[int, int]) -> np.ndarray:
@@ -42,7 +46,12 @@ def analyze_face_landmarks(frames_rgb: List[np.ndarray]) -> Dict[str, Any]:
     blink_indices: List[int] = []
     face_hulls: List[np.ndarray] = []
 
-    with _mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5) as mesh:
+    mp_face_mesh = _get_face_mesh()
+    if mp_face_mesh is None:
+        # Mediapipe unavailable; return empty metrics gracefully
+        return {"ear_left": [], "ear_right": [], "blink_indices": [], "lip_aperture": [], "face_hulls": []}
+
+    with mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5) as mesh:
         for idx, img in enumerate(frames_rgb):
             res = mesh.process(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
             if not res.multi_face_landmarks:

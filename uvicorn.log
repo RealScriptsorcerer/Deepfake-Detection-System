@@ -5,9 +5,10 @@ Traceback (most recent call last):
   File "/workspace/.venv/lib/python3.13/site-packages/click/core.py", line 1442, in __call__
     return self.main(*args, **kwargs)
            ~~~~~~~~~^^^^^^^^^^^^^^^^^
-  File "/workspace/.venv/lib/python3.13/site-packages/click/core.pINFO:     127.0.0.1:50660 - "GET /health HTTP/1.1" 200 OK
-workspace/.venv/lib/python3.13/site-packages/click/core.py", line 1226, in invoke
-    return ctx.invoke(self.callback, **ctx.params)
+  File "/workspace/.venv/lib/python3.13/site-packages/click/core.py", line 1363, in main
+    rv = self.invoke(ctx)
+  File "/workspace/.venv/lib/python3.13/site-packages/click/core.py", line INFO:     127.0.0.1:49418 - "GET /metrics HTTP/1.1" 404 Not Found
+
            ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/workspace/.venv/lib/python3.13/site-packages/click/core.py", line 794, in invoke
     return callback(*args, **kwargs)
@@ -55,6 +56,6 @@ workspace/.venv/lib/python3.13/site-packages/click/core.py", line 1226, in invok
   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
   File "/workspace/backend/app/main.py", line 4, in <module>
     from .routers import detect
-  File "/workspace/backend/app/routers/detect.py", line 104
+  File "/workspace/backend/app/routers/detect.py", line 116
     @router.post("/batch")
 SyntaxError: expected 'except' or 'finally' block

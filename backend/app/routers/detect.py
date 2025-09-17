@@ -8,6 +8,7 @@ from ..core.video.processing import analyze_video_file, analyze_image_file
 from ..core.audio.processing import analyze_audio_file
 from ..core.ensemble import SimpleEnsembleAggregator
 from ..core.storage.db import save_result
+from ..core.utils.webhook import notify_high_risk
 
 
 router = APIRouter()
@@ -21,7 +22,10 @@ async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_image_file(temp_path)
-        result_id = save_result("image", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        score = float(result.get("score", 0.0))
+        result_id = save_result("image", file.filename, result.get("label", "unknown"), score, result)
+        if score >= 0.8:
+            notify_high_risk({"id": result_id, "modality": "image", "filename": file.filename, "score": score})
         return JSONResponse({"id": result_id, **result})
     finally:
         try:
@@ -37,7 +41,10 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_video_file(temp_path)
-        result_id = save_result("video", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        score = float(result.get("score", 0.0))
+        result_id = save_result("video", file.filename, result.get("label", "unknown"), score, result)
+        if score >= 0.8:
+            notify_high_risk({"id": result_id, "modality": "video", "filename": file.filename, "score": score})
         return JSONResponse({"id": result_id, **result})
     finally:
         try:
@@ -53,7 +60,10 @@ async def detect_audio(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_audio_file(temp_path)
-        result_id = save_result("audio", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        score = float(result.get("score", 0.0))
+        result_id = save_result("audio", file.filename, result.get("label", "unknown"), score, result)
+        if score >= 0.8:
+            notify_high_risk({"id": result_id, "modality": "audio", "filename": file.filename, "score": score})
         return JSONResponse({"id": result_id, **result})
     finally:
         try:
@@ -98,6 +108,8 @@ async def detect_av(video: UploadFile = File(None), audio: UploadFile = File(Non
             },
         }
         result_id = save_result("av", video.filename if video else (audio.filename if audio else ""), label, float(agg), result_payload)
+        if float(agg) >= 0.8:
+            notify_high_risk({"id": result_id, "modality": "av", "filename": (video.filename if video else (audio.filename if audio else "")), "score": float(agg)})
         return JSONResponse({"id": result_id, **result_payload})
 
 
