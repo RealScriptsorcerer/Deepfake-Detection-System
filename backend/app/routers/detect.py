@@ -7,6 +7,7 @@ from ..core.utils.common import save_upload_to_temp
 from ..core.video.processing import analyze_video_file, analyze_image_file
 from ..core.audio.processing import analyze_audio_file
 from ..core.ensemble import SimpleEnsembleAggregator
+from ..core.storage.db import save_result
 
 
 router = APIRouter()
@@ -20,7 +21,8 @@ async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_image_file(temp_path)
-        return JSONResponse(result)
+        result_id = save_result("image", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        return JSONResponse({"id": result_id, **result})
     finally:
         try:
             os.remove(temp_path)
@@ -35,7 +37,8 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_video_file(temp_path)
-        return JSONResponse(result)
+        result_id = save_result("video", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        return JSONResponse({"id": result_id, **result})
     finally:
         try:
             os.remove(temp_path)
@@ -50,7 +53,8 @@ async def detect_audio(file: UploadFile = File(...)) -> JSONResponse:
     temp_path = save_upload_to_temp(file)
     try:
         result = analyze_audio_file(temp_path)
-        return JSONResponse(result)
+        result_id = save_result("audio", file.filename, result.get("label", "unknown"), float(result.get("score", 0.0)), result)
+        return JSONResponse({"id": result_id, **result})
     finally:
         try:
             os.remove(temp_path)
@@ -84,7 +88,7 @@ async def detect_av(video: UploadFile = File(None), audio: UploadFile = File(Non
             scores["audio"] = float(audio_result.get("score", 0.0))
         agg = aggregator.aggregate(scores) if scores else 0.0
         label = "fake" if agg >= 0.5 else "real"
-        return JSONResponse({
+        result_payload = {
             "modality": "av",
             "label": label,
             "score": round(float(agg), 4),
@@ -92,7 +96,35 @@ async def detect_av(video: UploadFile = File(None), audio: UploadFile = File(Non
                 "video": video_result,
                 "audio": audio_result,
             },
-        })
+        }
+        result_id = save_result("av", video.filename if video else (audio.filename if audio else ""), label, float(agg), result_payload)
+        return JSONResponse({"id": result_id, **result_payload})
+
+
+@router.post("/batch")
+async def detect_batch(files: list[UploadFile] = File(...)) -> JSONResponse:
+    results = []
+    for f in files:
+        try:
+            temp_path = save_upload_to_temp(f)
+            if f.content_type and f.content_type.startswith("image/"):
+                res = analyze_image_file(temp_path)
+                rid = save_result("image", f.filename, res.get("label", "unknown"), float(res.get("score", 0.0)), res)
+            elif f.content_type and f.content_type.startswith("video/"):
+                res = analyze_video_file(temp_path)
+                rid = save_result("video", f.filename, res.get("label", "unknown"), float(res.get("score", 0.0)), res)
+            elif f.content_type and f.content_type.startswith("audio/"):
+                res = analyze_audio_file(temp_path)
+                rid = save_result("audio", f.filename, res.get("label", "unknown"), float(res.get("score", 0.0)), res)
+            else:
+                continue
+            results.append({"id": rid, **res})
+        finally:
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+    return JSONResponse({"items": results})
     finally:
         for p in (video_path, audio_path):
             if p and os.path.exists(p):

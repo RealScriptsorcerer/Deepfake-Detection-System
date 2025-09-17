@@ -9,6 +9,8 @@ from .heuristics import (
     combine_video_scores_with_flow,
 )
 from ..utils.visualization import plot_video_suspicion_timeline
+from .landmarks import analyze_face_landmarks
+from ..av.sync import compute_av_sync_score
 
 
 def _extract_frames_rgb(video_path: str, max_frames: int = 600, target_short_side: int = 256) -> List[np.ndarray]:
@@ -51,6 +53,7 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
     temporal = compute_temporal_difference_scores(frames)
     freq = compute_frequency_artifact_scores(frames)
     flow = compute_optical_flow_inconsistency(frames)
+    lm = analyze_face_landmarks(frames)
     per_frame, overall = combine_video_scores_with_flow(temporal, freq, flow)
 
     label = "fake" if overall >= 0.5 else "real"
@@ -59,6 +62,7 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
     fps = _safe_fps(video_path)
     top_idx = np.argsort(np.array(per_frame))[-10:][::-1].tolist()
     top_ts = [round(i / max(fps, 1.0), 3) for i in top_idx]
+    av_sync = compute_av_sync_score(video_path, lm.get("lip_aperture", []), fps)
 
     return {
         "modality": "video",
@@ -69,9 +73,14 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
             "temporal_diff": temporal,
             "frequency_ratio": freq,
             "optical_flow_inconsistency": flow,
+            "ear_left": lm.get("ear_left", []),
+            "ear_right": lm.get("ear_right", []),
+            "blink_indices": lm.get("blink_indices", []),
+            "lip_aperture": lm.get("lip_aperture", []),
             "timeline_png_base64": timeline_png_b64,
             "top_suspicious_frames": top_idx,
             "top_suspicious_timestamps": top_ts,
+            "av_sync": av_sync,
         },
     }
 

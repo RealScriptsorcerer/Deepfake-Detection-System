@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import detect
+from .routers import history
 
 
 def create_app() -> FastAPI:
@@ -16,6 +17,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(detect.router, prefix="/detect", tags=["detect"]) 
+    app.include_router(history.router, prefix="/history", tags=["history"]) 
 
     @app.get("/health")
     def health() -> dict:
