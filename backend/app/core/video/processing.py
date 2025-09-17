@@ -5,7 +5,8 @@ import numpy as np
 from .heuristics import (
     compute_temporal_difference_scores,
     compute_frequency_artifact_scores,
-    combine_video_scores,
+    compute_optical_flow_inconsistency,
+    combine_video_scores_with_flow,
 )
 from ..utils.visualization import plot_video_suspicion_timeline
 
@@ -49,10 +50,15 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
 
     temporal = compute_temporal_difference_scores(frames)
     freq = compute_frequency_artifact_scores(frames)
-    per_frame, overall = combine_video_scores(temporal, freq)
+    flow = compute_optical_flow_inconsistency(frames)
+    per_frame, overall = combine_video_scores_with_flow(temporal, freq, flow)
 
     label = "fake" if overall >= 0.5 else "real"
     timeline_png_b64 = plot_video_suspicion_timeline(per_frame)
+    # Top suspicious frames and approximate timestamps
+    fps = _safe_fps(video_path)
+    top_idx = np.argsort(np.array(per_frame))[-10:][::-1].tolist()
+    top_ts = [round(i / max(fps, 1.0), 3) for i in top_idx]
 
     return {
         "modality": "video",
@@ -62,7 +68,10 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
             "per_frame_suspicion": per_frame,
             "temporal_diff": temporal,
             "frequency_ratio": freq,
+            "optical_flow_inconsistency": flow,
             "timeline_png_base64": timeline_png_b64,
+            "top_suspicious_frames": top_idx,
+            "top_suspicious_timestamps": top_ts,
         },
     }
 
@@ -90,4 +99,15 @@ def analyze_image_file(image_path: str) -> Dict[str, Any]:
             "frequency_ratio": freq_ratio,
         },
     }
+
+
+def _safe_fps(video_path: str) -> float:
+    cap = cv2.VideoCapture(video_path)
+    try:
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        if not np.isfinite(fps) or fps <= 0:
+            return 25.0
+        return fps
+    finally:
+        cap.release()
 
