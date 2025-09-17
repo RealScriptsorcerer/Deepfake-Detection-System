@@ -43,6 +43,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 pip install -r frontend/requirements.txt
 export API_URL=http://localhost:8000
+export API_KEY=  # set if API has key auth enabled
 streamlit run frontend/streamlit_app.py
 ```
 
@@ -64,6 +65,10 @@ streamlit run frontend/streamlit_app.py
  - API key: set `DETECT_API_KEY` to require `x-api-key` header (empty to disable)
  - Database: set `DEEPFAKE_DB` to persist (compose mounts `/data` volume)
  - Webhook: set `DF_WEBHOOK_URL` to receive notifications on score >= 0.8
+- Models: place weights in `MODEL_DIR` (default `/models`); `/models/status` shows availability
+- Live detection (local): `python scripts/live_detect.py 0` or an RTSP URL
+- Dataset ingestion: `python scripts/ingest_dataset.py <folder> http://localhost:8000`
+- Download models (scaffold): `python scripts/download_models.py --dir /models`
 
 ## Next Steps
 - Integrate pretrained backbones and an ensemble aggregator

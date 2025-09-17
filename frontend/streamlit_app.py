@@ -4,6 +4,7 @@ import streamlit as st
 import base64
 
 API_URL = os.environ.get("API_URL") or st.secrets.get("API_URL", "http://localhost:8000")
+API_KEY = os.environ.get("API_KEY") or st.secrets.get("API_KEY", "")
 
 st.set_page_config(page_title="Deepfake Detection", layout="wide")
 st.title("Deepfake Detection System (MVP)")
@@ -29,7 +30,8 @@ with tab1:
     img_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
     if img_file is not None and st.button("Analyze Image"):
         files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
-        resp = requests.post(f"{API_URL}/detect/image", files=files, timeout=120)
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.post(f"{API_URL}/detect/image", files=files, headers=headers, timeout=120)
         if resp.ok:
             render_result(resp.json())
         else:
@@ -40,7 +42,8 @@ with tab2:
     vid_file = st.file_uploader("Upload video", type=["mp4", "avi", "mov", "mkv"])
     if vid_file is not None and st.button("Analyze Video"):
         files = {"file": (vid_file.name, vid_file.getvalue(), vid_file.type)}
-        resp = requests.post(f"{API_URL}/detect/video", files=files, timeout=600)
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.post(f"{API_URL}/detect/video", files=files, headers=headers, timeout=600)
         if resp.ok:
             data = resp.json()
             render_result(data)
@@ -62,7 +65,8 @@ with tab3:
     aud_file = st.file_uploader("Upload audio", type=["wav", "mp3", "flac", "m4a", "ogg"]) 
     if aud_file is not None and st.button("Analyze Audio"):
         files = {"file": (aud_file.name, aud_file.getvalue(), aud_file.type)}
-        resp = requests.post(f"{API_URL}/detect/audio", files=files, timeout=300)
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.post(f"{API_URL}/detect/audio", files=files, headers=headers, timeout=300)
         if resp.ok:
             render_result(resp.json())
         else:
@@ -75,7 +79,8 @@ with tab4:
         mp = []
         for f in files:
             mp.append(("files", (f.name, f.getvalue(), f.type)))
-        resp = requests.post(f"{API_URL}/detect/batch", files=mp, timeout=1200)
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.post(f"{API_URL}/detect/batch", files=mp, headers=headers, timeout=1200)
         if resp.ok:
             st.json(resp.json())
         else:
@@ -83,12 +88,13 @@ with tab4:
 
     st.header("History")
     if st.button("Refresh History"):
-        resp = requests.get(f"{API_URL}/history/list")
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.get(f"{API_URL}/history/list", headers=headers)
         if resp.ok:
             items = resp.json().get("items", [])
             for item in items:
                 with st.expander(f"[{item['id']}] {item['modality']} {item['label']} {item['score']:.3f} - {item.get('filename','')}"):
-                    detail = requests.get(f"{API_URL}/history/get/{item['id']}")
+                    detail = requests.get(f"{API_URL}/history/get/{item['id']}", headers=headers)
                     if detail.ok:
                         data = detail.json()
                         st.json(data)
@@ -100,7 +106,18 @@ with tab5:
     st.header("URL/YouTube Ingestion")
     url = st.text_input("Paste media URL (YouTube, MP4, etc.)")
     if st.button("Analyze URL") and url:
-        resp = requests.post(f"{API_URL}/ingest/url", json={"url": url}, timeout=1200)
+        headers = {"x-api-key": API_KEY} if API_KEY else {}
+        resp = requests.post(f"{API_URL}/ingest/url", json={"url": url}, headers=headers, timeout=1200)
+
+# Footer: models status
+st.divider()
+try:
+    headers = {"x-api-key": API_KEY} if API_KEY else {}
+    ms = requests.get(f"{API_URL}/models/status", headers=headers, timeout=10)
+    if ms.ok:
+        st.caption(f"Models: {ms.json()}")
+except Exception:
+    pass
         if resp.ok:
             render_result(resp.json())
         else:
