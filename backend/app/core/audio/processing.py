@@ -83,6 +83,13 @@ def _compute_baseline_scores(y: np.ndarray, sr: int) -> Dict[str, float]:
     flatness = np.clip(geom / arith, 0.0, 1.0)
     flatness_mean = float(np.mean(flatness))
 
+    # Phase inconsistency heuristic (approximate neural vocoder artifact):
+    # compute frame-wise phase delta variance across bins
+    fft_c = np.fft.rfft(frames, axis=1)
+    phase = np.angle(fft_c)
+    dphi = np.diff(phase, axis=0)
+    phase_var = float(np.mean(np.var(dphi, axis=1)))
+
     # Heuristic score
     score = 0.0
     score += 0.45 * np.clip(centroid_mean_norm, 0.0, 1.0)
@@ -95,6 +102,7 @@ def _compute_baseline_scores(y: np.ndarray, sr: int) -> Dict[str, float]:
         "centroid_mean_norm": centroid_mean_norm,
         "bandwidth_mean_norm": bandwidth_mean_norm,
         "flatness_mean": flatness_mean,
+        "phase_delta_var": phase_var,
         "heuristic_score": score,
     }
 

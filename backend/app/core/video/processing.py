@@ -11,6 +11,7 @@ from .heuristics import (
 from ..utils.visualization import plot_video_suspicion_timeline
 from .landmarks import analyze_face_landmarks
 from ..av.sync import compute_av_sync_score
+from ..utils.visualization import overlay_heatmap, encode_image_rgb_base64_png
 
 
 def _extract_frames_rgb(video_path: str, max_frames: int = 600, target_short_side: int = 256) -> List[np.ndarray]:
@@ -64,6 +65,45 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
     top_ts = [round(i / max(fps, 1.0), 3) for i in top_idx]
     av_sync = compute_av_sync_score(video_path, lm.get("lip_aperture", []), fps)
 
+    # Generate heatmap overlays for top suspicious frames
+    overlays: List[Dict[str, Any]] = []
+    # Precompute optical flow magnitudes per frame pair for heatmap
+    flow_mags: List[np.ndarray] = []
+    if len(frames) > 1:
+        prev_gray = cv2.cvtColor(frames[0], cv2.COLOR_RGB2GRAY)
+        flow_mags.append(np.zeros_like(prev_gray, dtype=np.float32))
+        for idx in range(1, len(frames)):
+            gray = cv2.cvtColor(frames[idx], cv2.COLOR_RGB2GRAY)
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+            flow_mags.append(mag.astype(np.float32))
+            prev_gray = gray
+    else:
+        flow_mags = [np.zeros(frames[0].shape[:2], dtype=np.float32)]
+
+    face_hulls = lm.get("face_hulls", []) or [None] * len(frames)
+    for i in top_idx[:5]:
+        if i < 0 or i >= len(frames):
+            continue
+        # Build a simple heatmap: combination of flow magnitude and Laplacian edges
+        mag = flow_mags[i]
+        gray = cv2.cvtColor(frames[i], cv2.COLOR_RGB2GRAY)
+        lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+        lap_abs = np.abs(lap)
+        # Normalize components
+        mag_n = (mag - mag.min()) / (mag.ptp() + 1e-8)
+        lap_n = (lap_abs - lap_abs.min()) / (lap_abs.ptp() + 1e-8)
+        hm = 0.6 * mag_n + 0.4 * lap_n
+        # Mask to face hull if available
+        hull = face_hulls[i]
+        if hull is not None and isinstance(hull, np.ndarray):
+            mask = np.zeros_like(gray, dtype=np.uint8)
+            cv2.fillConvexPoly(mask, hull.astype(np.int32), 255)
+            hm = hm * (mask.astype(np.float32) / 255.0)
+        overlay = overlay_heatmap(frames[i], hm)
+        b64 = encode_image_rgb_base64_png(overlay)
+        overlays.append({"frame_index": i, "timestamp": round(i / max(fps, 1.0), 3), "overlay_png_base64": b64})
+
     return {
         "modality": "video",
         "label": label,
@@ -81,6 +121,7 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
             "top_suspicious_frames": top_idx,
             "top_suspicious_timestamps": top_ts,
             "av_sync": av_sync,
+            "heatmap_overlays": overlays,
         },
     }
 
