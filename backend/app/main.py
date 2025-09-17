@@ -7,6 +7,7 @@ from .routers import metrics as metrics_router
 from .routers import ws as ws_router
 from .routers import ingest as ingest_router
 from .routers import report as report_router
+from .routers import models as models_router
 from .core.security.auth import ApiKeyAuthMiddleware
 from .core.metrics import MetricsMiddleware
 
@@ -30,6 +31,14 @@ def create_app() -> FastAPI:
     app.include_router(ws_router.router, tags=["ws"]) 
     app.include_router(ingest_router.router, prefix="/ingest", tags=["ingest"]) 
     app.include_router(report_router.router, tags=["report"]) 
+    app.include_router(models_router.router, tags=["models"]) 
+
+    # Attempt to load deep backends at startup
+    try:
+        from .core.models.registry import REGISTRY
+        REGISTRY.load_all()
+    except Exception:
+        pass
 
     @app.get("/health")
     def health() -> dict:

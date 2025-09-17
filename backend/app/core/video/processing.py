@@ -12,6 +12,7 @@ from ..utils.visualization import plot_video_suspicion_timeline
 from .landmarks import analyze_face_landmarks
 from ..av.sync import compute_av_sync_score
 from ..utils.visualization import overlay_heatmap, encode_image_rgb_base64_png
+from ..models.registry import REGISTRY
 
 
 def _extract_frames_rgb(video_path: str, max_frames: int = 600, target_short_side: int = 256) -> List[np.ndarray]:
@@ -65,6 +66,9 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
     top_ts = [round(i / max(fps, 1.0), 3) for i in top_idx]
     av_sync = compute_av_sync_score(video_path, lm.get("lip_aperture", []), fps)
 
+    # Deep model score if available (placeholder backend)
+    deep_score = REGISTRY.video.predict_video_crops(frames, fps= _safe_fps(video_path)) if hasattr(REGISTRY, 'video') else None
+
     # Generate heatmap overlays for top suspicious frames
     overlays: List[Dict[str, Any]] = []
     # Precompute optical flow magnitudes per frame pair for heatmap
@@ -107,7 +111,7 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
     return {
         "modality": "video",
         "label": label,
-        "score": round(float(overall), 4),
+        "score": round(float(overall if deep_score is None else 0.7 * overall + 0.3 * float(deep_score)), 4),
         "explanations": {
             "per_frame_suspicion": per_frame,
             "temporal_diff": temporal,
@@ -121,6 +125,7 @@ def analyze_video_file(video_path: str) -> Dict[str, Any]:
             "top_suspicious_frames": top_idx,
             "top_suspicious_timestamps": top_ts,
             "av_sync": av_sync,
+            "deep_video_score": deep_score,
             "heatmap_overlays": overlays,
         },
     }

@@ -7,6 +7,7 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 
 from ..utils.common import figure_to_base64_png
+from ..models.registry import REGISTRY
 
 
 def _decode_to_wav_mono_16k(input_path: str) -> Tuple[str, int]:
@@ -123,7 +124,9 @@ def analyze_audio_file(audio_path: str) -> Dict[str, Any]:
     if y.size == 0:
         return {"label": "unknown", "score": 0.0, "detail": {"error": "Could not read audio"}}
     feats = _compute_baseline_scores(y, sr)
-    score = float(np.clip(1.1 * feats["heuristic_score"], 0.0, 1.0))
+    deep_score = REGISTRY.audio.predict_audio(y, sr) if hasattr(REGISTRY, 'audio') else None
+    base_score = float(np.clip(1.1 * feats["heuristic_score"], 0.0, 1.0))
+    score = float(np.clip(base_score if deep_score is None else 0.7 * base_score + 0.3 * float(deep_score), 0.0, 1.0))
     label = "fake" if score >= 0.5 else "real"
     spec_png_b64 = _spectrogram_png_b64(y, sr)
     return {
@@ -132,6 +135,7 @@ def analyze_audio_file(audio_path: str) -> Dict[str, Any]:
         "score": round(score, 4),
         "explanations": {
             **feats,
+            "deep_audio_score": deep_score,
             "spectrogram_png_base64": spec_png_b64,
         },
     }
