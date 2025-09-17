@@ -28,6 +28,8 @@ docker compose up --build
 ```
 - API: http://localhost:8000/docs
 - UI: http://localhost:8501
+ - Metrics: http://localhost:8000/metrics
+ - Report: http://localhost:8000/report/{id}
 
 ## Run locally (backend)
 ```
@@ -49,10 +51,19 @@ streamlit run frontend/streamlit_app.py
 - POST `/detect/video` (multipart `file`)
 - POST `/detect/audio` (multipart `file`)
 - POST `/detect/av` (multipart `video` and/or `audio`)
+- POST `/detect/batch` (multipart `files[]`)
+- POST `/ingest/url` (body `{url}`)
+- GET `/history/list`, `/history/get/{id}`, POST `/history/label/{id}`
+- GET `/report/{id}` (HTML)
+- GET `/metrics` (Prometheus)
+- WS `/ws/stream` (send/recv JSON with `frame_png_base64`)
 
 ## Notes
 - This MVP uses fast heuristics (temporal diffs, DCT frequency ratio; MFCC/ZCR-derived audio score). Replace with trained models via the ensemble interface in future phases.
 - ffmpeg is included for container-side codec support.
+ - API key: set `DETECT_API_KEY` to require `x-api-key` header (empty to disable)
+ - Database: set `DEEPFAKE_DB` to persist (compose mounts `/data` volume)
+ - Webhook: set `DF_WEBHOOK_URL` to receive notifications on score >= 0.8
 
 ## Next Steps
 - Integrate pretrained backbones and an ensemble aggregator

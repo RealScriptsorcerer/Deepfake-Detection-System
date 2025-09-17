@@ -7,7 +7,13 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - DEEPFAKE_DB=/data/deepfake_results.sqlite
+      - DF_SAVE_PAYLOADS=1
+      - DETECT_API_KEY=
+      - DF_WEBHOOK_URL=
     restart: unless-stopped
+    volumes:
+      - deepfake_data:/data
   ui:
     image: streamlit/streamlit:1.37.0
     container_name: deepfake_ui
@@ -23,4 +29,7 @@ services:
     depends_on:
       - api
     command: bash -lc "pip install requests && streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0"
+
+volumes:
+  deepfake_data:
 

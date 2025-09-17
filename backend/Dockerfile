@@ -16,12 +16,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+COPY requirements-dev.txt /app/requirements-dev.txt
+RUN pip install -r /app/requirements-dev.txt
 
 COPY app /app/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV DEEPFAKE_DB=/data/deepfake_results.sqlite
+VOLUME ["/data"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 

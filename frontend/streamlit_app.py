@@ -8,7 +8,7 @@ API_URL = os.environ.get("API_URL") or st.secrets.get("API_URL", "http://localho
 st.set_page_config(page_title="Deepfake Detection", layout="wide")
 st.title("Deepfake Detection System (MVP)")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Image", "Video", "Audio", "History & Batch"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Image", "Video", "Audio", "History & Batch", "URL Ingest"])
 
 
 def render_result(resp_json):
@@ -90,7 +90,19 @@ with tab4:
                 with st.expander(f"[{item['id']}] {item['modality']} {item['label']} {item['score']:.3f} - {item.get('filename','')}"):
                     detail = requests.get(f"{API_URL}/history/get/{item['id']}")
                     if detail.ok:
-                        st.json(detail.json())
+                        data = detail.json()
+                        st.json(data)
+                        st.markdown(f"[Open Report]({API_URL}/report/{item['id']})")
                     else:
                         st.error(detail.text)
+
+with tab5:
+    st.header("URL/YouTube Ingestion")
+    url = st.text_input("Paste media URL (YouTube, MP4, etc.)")
+    if st.button("Analyze URL") and url:
+        resp = requests.post(f"{API_URL}/ingest/url", json={"url": url}, timeout=1200)
+        if resp.ok:
+            render_result(resp.json())
+        else:
+            st.error(resp.text)
 
